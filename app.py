@@ -6,12 +6,18 @@ import time
 st.set_page_config(page_title="Scanner Bollinger B3", layout="wide")
 
 st.title("🔍 Scanner Bollinger (21, 3)")
-st.write("Busca ativos com fechamento abaixo da banda inferior (viés de compra)")
+st.write("Fechamento abaixo da banda inferior (viés de compra)")
 
-# lista inicial (depois ampliamos)
+# SUA LISTA COMPLETA (ajustada)
 tickers = [
-    "PETR4","VALE3","ITUB4","BOVA11","WEGE3",
-    "BBAS3","ABEV3","PRIO3","SUZB3","RENT3"
+    "RRRP3","ALOS3","ALPA4","ABEV3","ARZZ3","ASAI3","AZUL4","B3SA3","BBAS3","BBDC4","BBSE3","BPAC11",
+    "BRFS3","CCRO3","CMIG4","CPFE3","CPLE6","CSAN3","CSNA3","CYRE3","DXCO3","EGIE3","ELET3","ELET6",
+    "EMBR3","ENEV3","EQTL3","EZTC3","FLRY3","GGBR4","GOAU4","HAPV3","HYPE3","ITSA4","ITUB4","JBSS3",
+    "KLBN11","LREN3","MGLU3","MRFG3","MRVE3","MULT3","NTCO3","PETR4","PRIO3","RADL3","RAIL3","RENT3",
+    "SANB11","SBSP3","SLCE3","SUZB3","TAEE11","TIMS3","TOTS3","UGPA3","USIM5","VALE3","VIVT3","WEGE3",
+    "YDUQ3","AAPL34","AMZO34","GOGL34","MSFT34","TSLA34","META34","NFLX34","NVDC34","MELI34",
+    "BOVA11","IVVB11","SMAL11","GOLD11","DIVO11","GARE11","HGLG11","XPLG11","VILG11","XPML11","VISC11",
+    "KNRI11","MXRF11","KNCR11","CPTS11","IRDM11","TRXF11","HGRU11","ALZR11","VGIA11","GGRC11","AUVP11"
 ]
 
 @st.cache_data(ttl=3600)
@@ -25,9 +31,11 @@ def scan():
     progress = st.progress(0)
     status = st.empty()
 
+    total = len(tickers)
+
     for i, t in enumerate(tickers):
         try:
-            status.text(f"Processando {t} ({i+1}/{len(tickers)})")
+            status.text(f"Processando {t} ({i+1}/{total})")
 
             df = get_data(t)
 
@@ -61,18 +69,18 @@ def scan():
                     "Distância (%)": dist
                 })
 
-            time.sleep(0.1)
+            time.sleep(0.05)  # controle de carga
 
         except:
             continue
 
-        progress.progress((i + 1) / len(tickers))
+        progress.progress((i + 1) / total)
 
     status.empty()
     return results
 
 
-if st.button("🚀 Rodar Scanner"):
+if st.button("🚀 Rodar Scanner Completo"):
     with st.spinner("Analisando mercado..."):
         data = scan()
 
