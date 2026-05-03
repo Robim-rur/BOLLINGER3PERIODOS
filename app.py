@@ -3,12 +3,12 @@ import pandas as pd
 import yfinance as yf
 import time
 
-st.set_page_config(page_title="Scanner Bollinger B3", layout="wide")
+st.set_page_config(page_title="Scanner Bollinger PRO", layout="wide")
 
-st.title("🔍 Scanner Bollinger (21, 3)")
-st.write("Fechamento abaixo da banda inferior (viés de compra)")
+st.title("📊 Scanner Bollinger PRO (21, 2.5)")
+st.write("Sinais de reversão com filtro de tendência (EMA 69)")
 
-# SUA LISTA COMPLETA (ajustada)
+# Lista de ativos (sua base)
 tickers = [
     "RRRP3","ALOS3","ALPA4","ABEV3","ARZZ3","ASAI3","AZUL4","B3SA3","BBAS3","BBDC4","BBSE3","BPAC11",
     "BRFS3","CCRO3","CMIG4","CPFE3","CPLE6","CSAN3","CSNA3","CYRE3","DXCO3","EGIE3","ELET3","ELET6",
@@ -22,7 +22,7 @@ tickers = [
 
 @st.cache_data(ttl=3600)
 def get_data(ticker):
-    df = yf.download(f"{ticker}.SA", period="90d", interval="1d", progress=False)
+    df = yf.download(f"{ticker}.SA", period="120d", interval="1d", progress=False)
     return df
 
 def scan():
@@ -39,7 +39,7 @@ def scan():
 
             df = get_data(t)
 
-            if df is None or df.empty or len(df) < 25:
+            if df is None or df.empty or len(df) < 80:
                 continue
 
             close = df["Close"]
@@ -49,27 +49,41 @@ def scan():
 
             close = close.dropna()
 
-            sma = close.rolling(21).mean()
-            std = close.rolling(21).std()
-            lower = sma - 3 * std
+            # === INDICADORES ===
+            sma21 = close.rolling(21).mean()
+            std21 = close.rolling(21).std()
+
+            lower = sma21 - 2.5 * std21
+            ema69 = close.ewm(span=69).mean()
 
             last_close = close.iloc[-1]
             last_lower = lower.iloc[-1]
+            last_ema69 = ema69.iloc[-1]
 
-            if pd.isna(last_lower):
+            if pd.isna(last_lower) or pd.isna(last_ema69):
                 continue
 
+            # === FILTROS ===
+
+            # 1. Tendência (seu padrão)
+            if last_close < last_ema69:
+                continue
+
+            # 2. Sinal Bollinger
             if last_close < last_lower:
+
+                # Qualidade do sinal (quanto mais longe da banda, melhor)
                 dist = (last_lower - last_close) / last_lower * 100
 
                 results.append({
                     "Ativo": t,
                     "Preço": last_close,
                     "Banda Inferior": last_lower,
+                    "EMA 69": last_ema69,
                     "Distância (%)": dist
                 })
 
-            time.sleep(0.05)  # controle de carga
+            time.sleep(0.05)
 
         except:
             continue
@@ -80,7 +94,7 @@ def scan():
     return results
 
 
-if st.button("🚀 Rodar Scanner Completo"):
+if st.button("🚀 Rodar Scanner PRO"):
     with st.spinner("Analisando mercado..."):
         data = scan()
 
@@ -88,13 +102,17 @@ if st.button("🚀 Rodar Scanner Completo"):
 
         if data:
             df = pd.DataFrame(data)
+
+            # Ranking: maior distância = melhor sinal
             df = df.sort_values(by="Distância (%)", ascending=False)
 
             df["Preço"] = df["Preço"].map(lambda x: f"R$ {x:.2f}")
             df["Banda Inferior"] = df["Banda Inferior"].map(lambda x: f"R$ {x:.2f}")
+            df["EMA 69"] = df["EMA 69"].map(lambda x: f"R$ {x:.2f}")
             df["Distância (%)"] = df["Distância (%)"].map(lambda x: f"{x:.2f}%")
 
-            st.success(f"{len(df)} ativos encontrados")
+            st.success(f"{len(df)} ativos com sinal QUALIFICADO")
             st.dataframe(df, use_container_width=True)
+
         else:
-            st.warning("Nenhum ativo encontrou condição.")
+            st.warning("Nenhum sinal qualificado encontrado.")
