@@ -3,12 +3,12 @@ import pandas as pd
 import yfinance as yf
 import time
 
-st.set_page_config(page_title="Scanner PRO EDGE", layout="wide")
+st.set_page_config(page_title="Scanner PRO EDGE V2", layout="wide")
 
-st.title("📊 Scanner PRO EDGE (Bollinger + Probabilidade)")
-st.write("Setup: BB 21/2.5 + EMA69 + Gain 8% / Loss 5%")
+st.title("📊 Scanner PRO EDGE V2")
+st.write("BB 21/2.5 | EMA69 | Gain 6% / Loss 5%")
 
-# ================= LISTA COMPLETA =================
+# ===== LISTA =====
 tickers = [
 "RRRP3","ALOS3","ALPA4","ABEV3","ARZZ3","ASAI3","AZUL4",
 "B3SA3","BBAS3","BBDC3","BBDC4","BBSE3","BEEF3","BPAC11",
@@ -49,17 +49,15 @@ tickers = [
 "VGIR11","CVBI11","UTLL11","GGRC11","HERT11","AUVP11","IEEX11"
 ]
 
-# ================= LOTE =================
+# ===== LOTE =====
 batch_size = 25
-batch_index = st.selectbox("Escolha o lote", range(0, len(tickers)//batch_size + 1))
-tickers_batch = tickers[batch_index*batch_size:(batch_index+1)*batch_size]
+batch = st.selectbox("Lote", range(0, len(tickers)//batch_size + 1))
+tickers_batch = tickers[batch*batch_size:(batch+1)*batch_size]
 
-# ================= DATA =================
 @st.cache_data(ttl=3600)
-def get_data(ticker):
-    return yf.download(f"{ticker}.SA", period="2y", interval="1d", progress=False)
+def get_data(t):
+    return yf.download(f"{t}.SA", period="2y", interval="1d", progress=False)
 
-# ================= PROBABILIDADE =================
 def calc_prob(df):
     wins, losses = 0, 0
 
@@ -69,20 +67,21 @@ def calc_prob(df):
     lower = sma - 2.5 * std
     ema = close.ewm(span=69).mean()
 
-    for i in range(80, len(close)-20):
+    for i in range(80, len(close)-30):
 
         price = close.iloc[i]
 
         if pd.isna(lower.iloc[i]) or pd.isna(ema.iloc[i]):
             continue
 
-        if price >= ema.iloc[i]*0.98 and price <= lower.iloc[i]*1.01:
+        # filtros FLEXÍVEIS
+        if price >= ema.iloc[i]*0.95 and price <= lower.iloc[i]*1.03:
 
             entry = price
-            gain = entry * 1.08
+            gain = entry * 1.06
             stop = entry * 0.95
 
-            future = close.iloc[i+1:i+20]
+            future = close.iloc[i+1:i+30]
 
             for f in future:
                 if f >= gain:
@@ -98,17 +97,11 @@ def calc_prob(df):
 
     return wins / total * 100
 
-# ================= SCAN =================
 def scan():
     results = []
 
-    progress = st.progress(0)
-    status = st.empty()
-
-    for i, t in enumerate(tickers_batch):
+    for t in tickers_batch:
         try:
-            status.text(f"{t} ({i+1}/{len(tickers_batch)})")
-
             df = get_data(t)
 
             if df is None or len(df) < 100:
@@ -123,17 +116,17 @@ def scan():
 
             last = close.iloc[-1]
 
-            if last >= ema.iloc[-1]*0.98 and last <= lower.iloc[-1]*1.01:
+            if last >= ema.iloc[-1]*0.95 and last <= lower.iloc[-1]*1.03:
 
                 prob = calc_prob(df)
 
-                if prob is None:
+                if prob is None or prob < 50:
                     continue
 
                 results.append({
                     "Ativo": t,
                     "Preço": last,
-                    "Prob Gain (%)": prob
+                    "Probabilidade (%)": prob
                 })
 
             time.sleep(0.05)
@@ -141,26 +134,20 @@ def scan():
         except:
             continue
 
-        progress.progress((i+1)/len(tickers_batch))
-
-    status.empty()
     return results
 
-# ================= EXECUÇÃO =================
 if st.button("🚀 Rodar Scanner"):
-    with st.spinner("Processando..."):
+    data = scan()
 
-        data = scan()
+    if data:
+        df = pd.DataFrame(data)
+        df = df.sort_values(by="Probabilidade (%)", ascending=False)
 
-        if data:
-            df = pd.DataFrame(data)
-            df = df.sort_values(by="Prob Gain (%)", ascending=False)
+        df["Preço"] = df["Preço"].map(lambda x: f"R$ {x:.2f}")
+        df["Probabilidade (%)"] = df["Probabilidade (%)"].map(lambda x: f"{x:.1f}%")
 
-            df["Preço"] = df["Preço"].map(lambda x: f"R$ {x:.2f}")
-            df["Prob Gain (%)"] = df["Prob Gain (%)"].map(lambda x: f"{x:.1f}%")
+        st.success("Melhores oportunidades:")
+        st.dataframe(df, use_container_width=True)
 
-            st.success("Ranking por probabilidade:")
-            st.dataframe(df, use_container_width=True)
-
-        else:
-            st.warning("Nenhum ativo com sinal neste lote.")
+    else:
+        st.warning("Nenhum ativo com edge neste lote.")
