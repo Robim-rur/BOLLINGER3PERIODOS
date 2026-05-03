@@ -1,5 +1,3 @@
 import streamlit as st
 
-st.title("Funcionando")
-
-st.write("Se você está vendo isso, o deploy deu certo.")
+st.title("Funcionando no Render")
